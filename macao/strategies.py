@@ -1,4 +1,4 @@
-from random import choice, shuffle, random
+from random import choice, random
 
 from macao import can_play
 

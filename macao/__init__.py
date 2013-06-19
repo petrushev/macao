@@ -7,7 +7,7 @@ SUITES = tuple(u'♣♠♦♥')
 HEADS = tuple(h for h in map(str, range(2, 11)) + list('JQKA'))
 DECK = frozenset(h+s for h in HEADS for s in SUITES)
 
-HAND_SIZE = 4
+HAND_SIZE = 6
 
 def new_deck():
     deck = list(DECK)
@@ -112,7 +112,7 @@ class Game(object):
         self.announce_win(player)
 
     def announce_win(self, player):
-        print 'won player' , player
+        print 'won:' , player
         self.finished = True
         for p_id, p in enumerate(self.players):
             if p == player: continue
