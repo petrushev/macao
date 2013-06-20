@@ -17,7 +17,7 @@ def new_deck():
 
 def can_play(card, ground):
     """True if `card` can be played on top of `ground`"""
-    return (card[:-1] == ground[:-1]) or (card[-1] == ground[-1])
+    return card[0] == 'J' or card[:-1] == ground[:-1] or card[-1] == ground[-1]
 
 
 class Player(object):
@@ -33,19 +33,19 @@ class Player(object):
         return ('<Player %d: ' % idx ) + ' '.join(self.hand).encode('utf-8')+'>'
 
     def play(self):
-        #TODO: move 'win' mechanics to Game class
         # if empty hand - announce win
         if len(self.hand)==0:
             self.game.won(self)
         else:
             self.method.play()
 
-    def play_card(self, played):
+    def play_card(self, played, wanted_suite = None):
         self.has_drawn = False
         self.hand.remove(played)  # remove played card from hand
-        self.game.turned(played)  # notify game (callback)
+        self.game.turned(played, wanted_suite)  # notify game (callback)
 
     def draw(self):
+        # TODO : change mechanics when introducing '7's
         if self.has_drawn:
             # draws second time
             self.has_drawn = False
@@ -83,15 +83,17 @@ class Game(object):
         print '- %d -   fetched extra' % (self.turn + 1)
         return self.deck.popleft()
 
-    def turned(self, played):
+    def turned(self, played, wanted_suite = None):
         current = self.turn + 1
         if played is not None:
-            self.deck.append(self.ground)  # put current ground back in deck
+            if self.ground[0]!='x':
+                self.deck.append(self.ground)  # put current ground back in deck
             self.ground = played   # update ground
 
             print '- %d -  ' % current, played
 
             p = self.players[self.turn]
+
 
             # announce last
             if len(p.hand)==1:
@@ -102,6 +104,12 @@ class Game(object):
             if head in ('A','8'):
                 self.turn = (self.turn + 1) % self.num_players
                 print '- %d -   jumped' % (self.turn + 1)
+
+            elif head == 'J':
+                print '        suite:', wanted_suite.encode('utf-8')
+                if self.ground[0]!='x':
+                    self.deck.append(self.ground)
+                self.ground = u'x' + wanted_suite
 
         else:
             print '- %d -   skip' % current

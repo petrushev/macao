@@ -7,4 +7,3 @@ todos:
 ------
 
 - add 7 (take two) rule behaviour and AI
-- add J (change suite) rule behaviour and AI

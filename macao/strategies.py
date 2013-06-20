@@ -1,6 +1,6 @@
 from random import choice, random
 
-from macao import can_play
+from macao import can_play, SUITES
 
 class Strategy(object):
     def __init__(self, player):
@@ -36,7 +36,19 @@ class Human(Strategy):
             return self.play()
 
         # play the card
-        self.player.play_card(played)
+        if played[0]=='J':
+            ord_ = '0'
+            while not(ord_.isdigit()) or int(ord_)<1 or int(ord_)>4:
+                ord_ = raw_input(' '.join(tuple(SUITES)).encode('utf-8')+' : ')
+                ord_ = ord_.strip()
+            ord_ = int(ord_) - 1
+
+            suite = SUITES[ord_]
+            self.player.play_card(played, wanted_suite=suite)
+
+        else:
+
+            self.player.play_card(played)
 
     def draw(self):
         self.player.draw()
@@ -58,7 +70,14 @@ class RandomAi(Strategy):
         if played == 0:
             return self.draw()
 
-        self.player.play_card(played)
+        if played[0]=='J':
+            # laplace smoothed random suite
+            choices = [h[-1] for h in self.player.hand] + list(SUITES)
+            suite = choice(choices)
+            self.player.play_card(played, wanted_suite = suite)
+
+        else:
+            self.player.play_card(played)
 
     def draw(self):
         self.player.draw()
