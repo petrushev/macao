@@ -9,14 +9,21 @@ class Strategy(object):
 class Human(Strategy):
 
     def play(self):
-        hand = list(self.player.hand)
-        ground = self.player.game.ground
+        player = self.player
+        hand = list(player.hand)
+        ground = player.game.ground
+
+        pushed_7 = player.game.pushed_7
 
         print ' '.join(hand).encode('utf-8'),' | ', ground.encode('utf-8')
 
         # check if there is no way to play
         possibles = [h for h in hand if can_play(h, ground)]
         if len(possibles)==0:
+            if pushed_7 > 0:
+                player.gather_7()
+                return self.play()
+
             return self.draw()
 
         # enter valid card for playing, 0 for draw
@@ -26,58 +33,81 @@ class Human(Strategy):
             ord_ = ord_.strip()
         ord_ = int(ord_)
 
+        # 0 is for drawing card or skipping
         if ord_ == 0:
+            if pushed_7 > 0:
+                player.gather_7()
+                return self.play()
+
             return self.draw()
 
         played = hand[ord_-1]
-        can_ = can_play(played, ground)
-        if not can_:
+        if not can_play(played, ground):
             print 'invalid game'
             return self.play()
 
+        # pushed cards with 7 but player plays otherwise - got to gather
+        if pushed_7 > 0 and played[0]!='7':
+            player.gather_7()
+
         # play the card
         if played[0]=='J':
+            # played Jack, need to change suite
             ord_ = '0'
-            while not(ord_.isdigit()) or int(ord_)<1 or int(ord_)>4:
+            while not(ord_.isdigit()) or int(ord_) < 1 or int(ord_) > 4:
                 ord_ = raw_input(' '.join(tuple(SUITES)).encode('utf-8')+' : ')
                 ord_ = ord_.strip()
             ord_ = int(ord_) - 1
 
             suite = SUITES[ord_]
-            self.player.play_card(played, wanted_suite=suite)
+            player.play_card(played, wanted_suite=suite)
 
         else:
-
-            self.player.play_card(played)
+            player.play_card(played)
 
     def draw(self):
         self.player.draw()
 
+
 class RandomAi(Strategy):
 
     def play(self):
+        player = self.player
         hand = list(self.player.hand)
-        ground = self.player.game.ground
+        ground = player.game.ground
+        pushed_7 = player.game.pushed_7
 
         # check if there is no way to play
         possibles = [h for h in hand if can_play(h, ground)]
         if len(possibles)==0:
+            if pushed_7 > 0:
+                player.gather_7()
+                return self.play()
+
             return self.draw()
 
         if random() > .7:
             possibles.append(0) # possibly bluff for new card
         played = choice(possibles)
+
         if played == 0:
+            if pushed_7 > 0:
+                player.gather_7()
+                return self.play()
+
             return self.draw()
 
+        if pushed_7 > 0 and played[0]!='7':
+            player.gather_7()
+
         if played[0]=='J':
-            # laplace smoothed random suite
-            choices = [h[-1] for h in self.player.hand] + list(SUITES)
+            # laplace smoothed for random suites
+            choices = [h[-1] for h in player.hand] + list(SUITES)
             suite = choice(choices)
-            self.player.play_card(played, wanted_suite = suite)
+            player.play_card(played, wanted_suite = suite)
 
         else:
-            self.player.play_card(played)
+            player.play_card(played)
 
     def draw(self):
         self.player.draw()

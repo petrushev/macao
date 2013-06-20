@@ -14,7 +14,6 @@ def new_deck():
     shuffle(deck)
     return deque(deck)
 
-
 def can_play(card, ground):
     """True if `card` can be played on top of `ground`"""
     return card[0] == 'J' or card[:-1] == ground[:-1] or card[-1] == ground[-1]
@@ -33,11 +32,7 @@ class Player(object):
         return ('<Player %d: ' % idx ) + ' '.join(self.hand).encode('utf-8')+'>'
 
     def play(self):
-        # if empty hand - announce win
-        if len(self.hand)==0:
-            self.game.won(self)
-        else:
-            self.method.play()
+        self.method.play()
 
     def play_card(self, played, wanted_suite = None):
         self.has_drawn = False
@@ -45,7 +40,6 @@ class Player(object):
         self.game.turned(played, wanted_suite)  # notify game (callback)
 
     def draw(self):
-        # TODO : change mechanics when introducing '7's
         if self.has_drawn:
             # draws second time
             self.has_drawn = False
@@ -56,6 +50,9 @@ class Player(object):
             self.has_drawn = True
             self.hand.append(self.game.deal_extra())  # update hand
             self.method.play()  # goto play after update
+
+    def gather_7(self):
+        self.hand.extend(self.game.push_7())
 
 
 class Game(object):
@@ -76,12 +73,21 @@ class Game(object):
         self.finished = False
         self.num_players = len(methods)
 
+        self.pushed_7 = 0 # queue for pushed cards with 7s
+
     def do_turn(self):
         self.players[self.turn].play()
 
     def deal_extra(self):
         print '- %d -   fetched extra' % (self.turn + 1)
         return self.deck.popleft()
+
+    def push_7(self):
+        # push queue from 7s to the current player's hand
+        res = [self.deck.popleft() for _ in range(self.pushed_7)]
+        print '- %d -   gathered %d' % (self.turn + 1, self.pushed_7)
+        self.pushed_7 = 0
+        return res
 
     def turned(self, played, wanted_suite = None):
         current = self.turn + 1
@@ -94,6 +100,10 @@ class Game(object):
 
             p = self.players[self.turn]
 
+            # announce win
+            if len(p.hand)==0:
+                self.won(p)
+                return
 
             # announce last
             if len(p.hand)==1:
@@ -110,6 +120,11 @@ class Game(object):
                 if self.ground[0]!='x':
                     self.deck.append(self.ground)
                 self.ground = u'x' + wanted_suite
+
+            elif head == '7':
+                print '        pushed 7: ',
+                self.pushed_7 = self.pushed_7 + 2
+                print self.pushed_7
 
         else:
             print '- %d -   skip' % current
