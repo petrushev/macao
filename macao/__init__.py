@@ -8,6 +8,7 @@ HEADS = tuple(h for h in map(str, range(2, 11)) + list('JQKA'))
 DECK = frozenset(h+s for h in HEADS for s in SUITES)
 
 HAND_SIZE = 6
+_HAND_RANGE = range(HAND_SIZE)
 
 def new_deck():
     deck = list(DECK)
@@ -57,19 +58,19 @@ class Game(object):
         self.deck = new_deck()
         self.players = []
 
+        _deck_popleft = self.deck.popleft
         for method in methods:
             # init player
             p = Player(game = self, method = method)
-            for _ in range(HAND_SIZE):
-                p.hand.append(self.deck.popleft())
+            p.hand = [_deck_popleft()
+                      for _ in _HAND_RANGE]
+
             self.players.append(p)
 
-        self.ground = self.deck.popleft()
+        self.ground = _deck_popleft()
         self.turn = 0   # which player's current turn is it
         self.num_players = len(methods)
-
         self.pushed_7 = 0 # queue for pushed cards with 7s
-
         self.winner = None
 
 
@@ -81,7 +82,8 @@ class Game(object):
             self.handle_skip()
             return
 
-        if played not in current_player.hand:
+        current_hand = current_player.hand
+        if played not in current_hand:
             print 'Ilegal move'
             return
 
@@ -92,18 +94,18 @@ class Game(object):
             print 'Ilegal move'
             return
 
-        print '- %d - :' % (current_player.idx + 1), played.encode('utf-8')
+        print '- %d - :' % (self.turn + 1), played.encode('utf-8')
 
-        current_player.hand.remove(played)
+        current_hand.remove(played)
 
         if self.pushed_7 and played_head!='7':
             self.push_7(current_player)
 
-        if len(current_player.hand)==1:
-            print '    - %d - :' % (current_player.idx + 1), ' last'
+        if len(current_hand)==1:
+            print '    - %d - :' % (self.turn + 1), ' last'
 
-        elif len(current_player.hand)==0:
-            print ' WINNER:', (current_player.idx + 1)
+        elif len(current_hand)==0:
+            print ' WINNER:', (self.turn + 1)
             self.winner = current_player
             return
 
@@ -131,7 +133,7 @@ class Game(object):
 
     def handle_skip(self):
         current_player = self.players[self.turn]
-        print '    < %d >' %  (current_player.idx + 1),
+        print '    < %d >' %  (self.turn + 1),
 
         if self.pushed_7:
             self.push_7(current_player)
