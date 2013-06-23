@@ -47,8 +47,6 @@ class RandomAi(Strategy):
         ground = player.game.ground
 
         possibles = [h for h in hand if can_play(h, ground)]
-        if random() < .15:
-            possibles.append(0) # possibly bluff for new card
         played = choice(possibles)
 
         if played == 0:
@@ -60,6 +58,59 @@ class RandomAi(Strategy):
                              if h[:-1]!='J']
             choices.extend(SUITES)
             wanted_suite = choice(choices)
+
+        else:
+            wanted_suite = None
+
+        return played, wanted_suite
+
+class AugmentedAi(Strategy):
+
+    def play(self):
+        player = self.player
+        hand = list(player.hand)
+        ground = player.game.ground
+        pushed_7 = player.game.pushed_7
+
+        possibles = [h for h in hand if can_play(h, ground)]
+        possible_heads = [h[:-1] for h in possibles]
+
+
+        # play 7 if pushed (slight improvement..)
+        if pushed_7 > 0 and '7' in possible_heads:
+            idx = possible_heads.index('7')
+            return possibles[idx], None
+
+        # play 'A' or '8' first
+        if 'A' in possible_heads:
+            idx = possible_heads.index('A')
+            return possibles[idx], None
+        if '8' in possible_heads:
+            idx = possible_heads.index('8')
+            return possibles[idx], None
+
+        # keep jacks for last
+        if 'J' in possible_heads:
+            rest = [h for h in possibles if h[0]!='J']
+            if rest!=[]:
+                possibles = rest
+                possible_heads = [h[:-1] for h in possibles]
+
+        # keep sevens for last (before jacks)
+        if '7' in possible_heads:
+            rest = [h for h in possibles if h[0]!='J']
+            if rest!=[]:
+                possibles = rest
+
+        played = choice(possibles)
+
+        if played[0]=='J':
+            choices = [h[-1] for h in hand
+                             if h[:-1]!='J']
+            if choices == []:
+                wanted_suite = played[-1]
+            else:
+                wanted_suite = choice(choices)
 
         else:
             wanted_suite = None
