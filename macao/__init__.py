@@ -26,34 +26,30 @@ class Player(object):
         self.hand = []              # current hand
         self.has_drawn = False      # did it draw extra already
         self.method = method(self)  # playing strategy (ai)
+        self._idx = None
+
+    @property
+    def idx(self):
+        if self._idx is None:
+            self._idx = self.game.players.index(self)
+        return self._idx
 
     def __repr__(self):
-        idx = self.game.players.index(self) + 1
+        idx = self.idx + 1
         return ('<Player %d: ' % idx ) + ' '.join(self.hand).encode('utf-8')+'>'
 
+    def has_choice(self):
+        ground = self.game.ground
+        for c in self.hand:
+            if can_play(c, ground):
+                return True
+        return False
+
     def play(self):
-        self.method.play()
+        if not self.has_choice():
+            return None, None
 
-    def play_card(self, played, wanted_suite = None):
-        self.has_drawn = False
-        self.hand.remove(played)  # remove played card from hand
-        self.game.turned(played, wanted_suite)  # notify game (callback)
-
-    def draw(self):
-        if self.has_drawn:
-            # draws second time
-            self.has_drawn = False
-            self.game.turned(None)  # notify empty
-
-        else:
-            # draws first time
-            self.has_drawn = True
-            self.hand.append(self.game.deal_extra())  # update hand
-            self.method.play()  # goto play after update
-
-    def gather_7(self):
-        self.hand.extend(self.game.push_7())
-
+        return self.method.play() # play card or play none
 
 class Game(object):
 
@@ -70,74 +66,88 @@ class Game(object):
 
         self.ground = self.deck.popleft()
         self.turn = 0   # which player's current turn is it
-        self.finished = False
         self.num_players = len(methods)
 
         self.pushed_7 = 0 # queue for pushed cards with 7s
 
+        self.winner = None
+
+
     def do_turn(self):
-        self.players[self.turn].play()
+        current_player = self.players[self.turn]
+        played, wanted_suite = current_player.play()
 
-    def deal_extra(self):
-        print '- %d -   fetched extra' % (self.turn + 1)
-        return self.deck.popleft()
+        if played is None:
+            self.handle_skip()
+            return
 
-    def push_7(self):
-        # push queue from 7s to the current player's hand
-        res = [self.deck.popleft() for _ in range(self.pushed_7)]
-        print '- %d -   gathered %d' % (self.turn + 1, self.pushed_7)
-        self.pushed_7 = 0
-        return res
+        if played not in current_player.hand:
+            print 'Ilegal move'
+            return
 
-    def turned(self, played, wanted_suite = None):
-        current = self.turn + 1
-        if played is not None:
-            if self.ground[0]!='x':
-                self.deck.append(self.ground)  # put current ground back in deck
-            self.ground = played   # update ground
+        played_head = played[:-1]
 
-            print '- %d -  ' % current, played
 
-            p = self.players[self.turn]
+        if played_head!='J' and played_head!=self.ground[:-1] and played[-1]!=self.ground[-1]:
+            print 'Ilegal move'
+            return
 
-            # announce win
-            if len(p.hand)==0:
-                self.won(p)
-                return
+        print '- %d - :' % (current_player.idx + 1), played.encode('utf-8')
 
-            # announce last
-            if len(p.hand)==1:
-                print '- %d -   ultimate' % current
+        current_player.hand.remove(played)
 
-            # check for jumps
-            head = played[:-1]
-            if head in ('A','8'):
-                self.turn = (self.turn + 1) % self.num_players
-                print '- %d -   jumped' % (self.turn + 1)
+        if self.pushed_7 and played_head!='7':
+            self.push_7(current_player)
 
-            elif head == 'J':
-                print '        suite:', wanted_suite.encode('utf-8')
-                if self.ground[0]!='x':
-                    self.deck.append(self.ground)
-                self.ground = u'x' + wanted_suite
+        if len(current_player.hand)==1:
+            print '    - %d - :' % (current_player.idx + 1), ' last'
 
-            elif head == '7':
-                print '        pushed 7: ',
-                self.pushed_7 = self.pushed_7 + 2
-                print self.pushed_7
+        elif len(current_player.hand)==0:
+            print ' WINNER:', (current_player.idx + 1)
+            self.winner = current_player
+            return
+
+        if played_head=='7':
+            self.pushed_7 = self.pushed_7 + 2
+            print '    pushed 7:', self.pushed_7
+
+        if played_head in ('A', '8'):
+            self.turn = (self.turn + 1) % self.num_players
+            print '    < %d > jumped' % (self.turn + 1)
+
+        if played_head=='J':
+            print '    changed suite:', wanted_suite.encode('utf-8')
+            self.deck.append(played)
+            self.ground = 'x' + wanted_suite
 
         else:
-            print '- %d -   skip' % current
+            if self.ground[0]!='x':
+                self.deck.append(self.ground)
+            self.ground = played
 
         self.turn = (self.turn + 1) % self.num_players
+        current_player.has_drawn = False
 
-    def won(self, player):
-        self.announce_win(player)
 
-    def announce_win(self, player):
-        print 'won:' , player
-        self.finished = True
-        for p_id, p in enumerate(self.players):
-            if p == player: continue
-            print p
-        print 'remaining in deck:', len(self.deck)
+    def handle_skip(self):
+        current_player = self.players[self.turn]
+        print '    < %d >' %  (current_player.idx + 1),
+
+        if self.pushed_7:
+            self.push_7(current_player)
+
+        elif current_player.has_drawn is False:
+            current_player.hand.append(self.deck.popleft())
+            current_player.has_drawn = True
+            print '    draw'
+
+        else:
+            current_player.has_drawn = False
+            self.turn = (self.turn + 1) % self.num_players
+            print '    skip'
+
+    def push_7(self, player):
+        for _ in range(self.pushed_7):
+            player.hand.append(self.deck.popleft())
+        print '    gathered 7:', self.pushed_7
+        self.pushed_7 = 0
